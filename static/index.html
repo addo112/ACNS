@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACNS Power Network Controller</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #0a0e1a;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --font-main: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.05), transparent 25%);
+        }
+
+        /* Utility Classes */
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .mono {
+            font-family: var(--font-mono);
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--card-border);
+            background: rgba(10, 14, 26, 0.9);
+            z-index: 10;
+        }
+
+        .header-title h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--primary);
+        }
+
+        .header-title p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+            box-shadow: 0 0 8px currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        .sim-time {
+            font-size: 1.25rem;
+            font-weight: 500;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            padding: 1rem;
+            gap: 1rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+
+        .control-section {
+            padding: 1rem;
+        }
+
+        .control-section h3 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .val-display {
+            color: var(--primary);
+            font-family: var(--font-mono);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--card-border);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-family: var(--font-main);
+            outline: none;
+        }
+        
+        select:focus, input[type="number"]:focus {
+            border-color: var(--primary);
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-danger { background: var(--danger); }
+        .btn-outline { background: transparent; border: 1px solid var(--card-border); }
+        .btn-outline:hover { background: rgba(255,255,255,0.05); }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 1rem;
+            overflow-y: auto;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .panel-large {
+            grid-column: span 2;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .panel-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .panel-content {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        /* Network Tooltip */
+        .d3-tooltip {
+            position: absolute;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid var(--card-border);
+            padding: 0.75rem;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+        }
+        
+        .d3-tooltip table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .d3-tooltip td {
+            padding: 2px 6px;
+        }
+        .d3-tooltip td:last-child {
+            font-family: var(--font-mono);
+            text-align: right;
+            color: var(--primary);
+        }
+
+        /* Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            height: 100%;
+        }
+
+        .metric-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .metric-title {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        
+        .metric-sparkline {
+            height: 20px;
+            margin-top: 5px;
+            width: 100%;
+        }
+
+        /* Toggle */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255,255,255,0.1);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px; width: 16px;
+            left: 4px; bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Footer */
+        footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--card-border);
+            background: rgba(10, 14, 26, 0.9);
+        }
+
+        .footer-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        
+        @keyframes glow {
+            0% { filter: drop-shadow(0 0 2px var(--danger)); }
+            50% { filter: drop-shadow(0 0 8px var(--danger)); }
+            100% { filter: drop-shadow(0 0 2px var(--danger)); }
+        }
+        
+        .inject-anim {
+            animation: pulse-danger 0.5s ease;
+        }
+        
+        @keyframes pulse-danger {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            100% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1><i class="fas fa-bolt"></i> ACNS Power Network Controller</h1>
+            <p>Ant Colony Neural Swarm Coordination for Self-Organizing Microgrids</p>
+        </div>
+        <div class="header-status">
+            <div class="status-badge" id="conn-status">
+                <div class="status-dot"></div>
+                <span id="conn-text">Disconnected</span>
+            </div>
+            <div class="sim-time mono">t = <span id="time-display">0.00</span>s</div>
+        </div>
+    </header>
+
+    <div class="app-container">
+        
+        <!-- Sidebar Control Panel -->
+        <aside class="sidebar">
+            
+            <div class="glass-panel control-section">
+                <h3><i class="fas fa-network-wired"></i> Configuration</h3>
+                <div class="form-group">
+                    <label>Network Topology</label>
+                    <select id="network-select">
+                        <option value="14">IEEE 14-Bus System</option>
+                        <option value="30" selected>IEEE 30-Bus System</option>
+                        <option value="118">IEEE 118-Bus System</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="margin:0;">Comparison Mode</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="compare-mode">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="glass-panel control-section">
+                <h3><i class="fas fa-sliders-h"></i> ACNS Parameters</h3>
+                
+                <!-- Pheromone Params -->
+                <div style="margin-bottom:1rem;">
+                    <div style="font-size:0.75rem; color:var(--primary); margin-bottom:0.5rem;">Pheromone Update</div>
+                    <div class="form-group">
+                        <label>Evaporation (ρ) <span class="val-display" id="val-rho">0.10</span></label>
+                        <input type="range" id="param-rho" min="0" max="1" step="0.01" value="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Reinforcement (κ) <span class="val-display" id="val-kappa">0.50</span></label>
+                        <input type="range" id="param-kappa" min="0" max="1" step="0.01" value="0.5">
+                    </div>
+                </div>
+
+                <!-- Neural Params -->
+                <div style="margin-bottom:1rem;">
+                    <div style="font-size:0.75rem; color:var(--primary); margin-bottom:0.5rem;">Neural Adaptation</div>
+                    <div class="form-group">
+                        <label>Learning Rate (ηθ) <span class="val-display" id="val-eta">0.01</span></label>
+                        <input type="range" id="param-eta" min="0.001" max="0.1" step="0.001" value="0.01">
+                    </div>
+                </div>
+                
+                <!-- Swarm Params -->
+                <div>
+                    <div style="font-size:0.75rem; color:var(--primary); margin-bottom:0.5rem;">Decision Weights</div>
+                    <div class="form-group">
+                        <label>Pheromone Infl. (α) <span class="val-display" id="val-alpha">1.0</span></label>
+                        <input type="range" id="param-alpha" min="0" max="5" step="0.1" value="1.0">
+                    </div>
+                    <div class="form-group">
+                        <label>Heuristic Infl. (β) <span class="val-display" id="val-beta">2.0</span></label>
+                        <input type="range" id="param-beta" min="0" max="5" step="0.1" value="2.0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel control-section">
+                <h3><i class="fas fa-play"></i> Simulation Controls</h3>
+                <div class="btn-group" style="margin-bottom: 1rem;">
+                    <button class="btn btn-primary" id="btn-create" title="Create Simulation"><i class="fas fa-hammer"></i></button>
+                    <button class="btn btn-success" id="btn-start" title="Start/Resume"><i class="fas fa-play"></i></button>
+                    <button class="btn btn-warning" id="btn-pause" title="Pause"><i class="fas fa-pause"></i></button>
+                    <button class="btn btn-outline" id="btn-reset" title="Reset"><i class="fas fa-undo"></i></button>
+                </div>
+                <div class="form-group">
+                    <label>Simulation Speed (Steps/Frame) <span class="val-display" id="val-speed">1</span></label>
+                    <input type="range" id="sim-speed" min="1" max="10" step="1" value="1">
+                </div>
+            </div>
+
+            <div class="glass-panel control-section" style="border-color: rgba(245, 158, 11, 0.3);">
+                <h3><i class="fas fa-exclamation-triangle" style="color:var(--warning)"></i> Disturbance Injection</h3>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="dist-type">
+                        <option value="load">Load Variation</option>
+                        <option value="pv">PV Generation Drop</option>
+                        <option value="fault">3-Phase Bus Fault</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Magnitude (%) <span class="val-display" id="val-dist-mag">15</span></label>
+                    <input type="range" id="dist-mag" min="-50" max="50" step="1" value="15">
+                </div>
+                <div class="form-group">
+                    <label>Target Bus (Random if empty)</label>
+                    <input type="number" id="dist-bus" placeholder="e.g. 5">
+                </div>
+                <button class="btn btn-danger" style="width:100%" id="btn-inject">
+                    <i class="fas fa-bolt"></i> Inject Disturbance
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            
+            <!-- Topology Panel -->
+            <div class="glass-panel panel panel-large">
+                <div class="panel-header">
+                    <span class="panel-title">Network Topology & Real-time Flow</span>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">
+                        <i class="fas fa-circle" style="color:var(--danger)"></i> High V
+                        <i class="fas fa-circle" style="color:var(--success)"></i> Nom V
+                        <i class="fas fa-circle" style="color:var(--primary)"></i> Low V
+                    </div>
+                </div>
+                <div class="panel-content" id="network-container">
+                    <!-- D3 svg goes here -->
+                </div>
+                <div class="d3-tooltip" id="net-tooltip"></div>
+            </div>
+
+            <!-- Frequency Chart -->
+            <div class="glass-panel panel">
+                <div class="panel-header">
+                    <span class="panel-title">System Frequency (Hz)</span>
+                </div>
+                <div class="panel-content">
+                    <canvas id="freqChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Voltage Profile -->
+            <div class="glass-panel panel">
+                <div class="panel-header">
+                    <span class="panel-title">Voltage Profile (p.u.)</span>
+                </div>
+                <div class="panel-content">
+                    <canvas id="voltageChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Pheromone Heatmap -->
+            <div class="glass-panel panel">
+                <div class="panel-header">
+                    <span class="panel-title">Pheromone Matrix (τij)</span>
+                </div>
+                <div class="panel-content">
+                    <canvas id="pheromoneHeatmap"></canvas>
+                </div>
+            </div>
+
+            <!-- Convergence J -->
+            <div class="glass-panel panel">
+                <div class="panel-header">
+                    <span class="panel-title">Global Error J(t) (Log Scale)</span>
+                </div>
+                <div class="panel-content">
+                    <canvas id="errorChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Metrics Panel -->
+            <div class="glass-panel panel panel-large" style="grid-column: span 2;">
+                <div class="panel-header">
+                    <span class="panel-title">Real-time Performance Metrics</span>
+                </div>
+                <div class="panel-content">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <span class="metric-title">Max Freq Deviation</span>
+                            <span class="metric-value mono" id="m-freq">0.000 Hz</span>
+                            <canvas id="spark-freq" class="metric-sparkline"></canvas>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-title">Voltage RMSE</span>
+                            <span class="metric-value mono" id="m-volt">0.000 p.u.</span>
+                            <canvas id="spark-volt" class="metric-sparkline"></canvas>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-title">Global Error J</span>
+                            <span class="metric-value mono" id="m-error">0.000</span>
+                            <canvas id="spark-err" class="metric-sparkline"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Status Bar -->
+    <footer>
+        <div class="footer-item">
+            <i class="fas fa-server"></i>
+            <span id="ws-status">Disconnected</span>
+        </div>
+        <div class="footer-item">
+            <i class="fas fa-microchip"></i>
+            <span id="compute-time">0 ms / step</span>
+        </div>
+        <div class="footer-item">
+            <i class="fas fa-memory"></i>
+            <span id="mem-usage">-- MB</span>
+        </div>
+        <div class="footer-item mono">
+            Step: <span id="step-count">0</span>
+        </div>
+    </footer>
+
+    <!-- App Logic -->
+    <script>
+        // Setup Chart.js Defaults
+        Chart.defaults.color = '#9ca3af';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+
+        // ---------------------------------------------------------
+        // Core Architecture
+        // ---------------------------------------------------------
+        
+        class MockDataGenerator {
+            constructor(numBuses) {
+                this.numBuses = numBuses;
+                this.time = 0;
+                this.baseFreq = 60;
+                this.targetV = 1.0;
+                this.error = 100;
+                this.disturbance = 0;
+                this.distDecay = 0.98;
+                
+                // Init state
+                this.v = Array.from({length: numBuses}, () => 1.0 + (Math.random()*0.02 - 0.01));
+                this.theta = Array.from({length: numBuses}, () => Math.random() * 0.1);
+                this.p = Array.from({length: numBuses}, () => Math.random() * 0.5);
+                this.q = Array.from({length: numBuses}, () => Math.random() * 0.2);
+            }
+            
+            injectDisturbance(mag, bus) {
+                this.disturbance = mag / 100.0;
+                if(bus !== null && bus < this.numBuses) {
+                    this.v[bus] += this.disturbance;
+                }
+                this.error += Math.abs(mag) * 2;
+            }
+
+            step(compareMode) {
+                this.time += 0.01;
+                this.disturbance *= this.distDecay; // decay disturbance
+                
+                // ACNS Convergence logic (mock)
+                this.error = Math.max(0.1, this.error * 0.995); 
+                let f_dev = Math.sin(this.time * 5) * 0.05 * (this.error/100) + (this.disturbance * 2);
+                
+                // Update buses
+                for(let i=0; i<this.numBuses; i++) {
+                    // Drift towards 1.0 but with noise
+                    let diff = 1.0 - this.v[i];
+                    this.v[i] += diff * 0.05 + (Math.random() - 0.5)*0.005 + (i%3===0? this.disturbance*0.5 : 0);
+                    
+                    this.p[i] = Math.max(0, this.p[i] + (Math.random() - 0.5)*0.01);
+                }
+                
+                let res = {
+                    time: this.time,
+                    freq: this.baseFreq + f_dev,
+                    v: [...this.v],
+                    theta: [...this.theta],
+                    p: [...this.p],
+                    q: [...this.q],
+                    j: this.error,
+                    pheromone: this.generateHeatmap()
+                };
+
+                if (compareMode) {
+                    res.freqDroop = this.baseFreq + f_dev * 2.5 + Math.sin(this.time * 2)*0.1;
+                    res.freqCons = this.baseFreq + f_dev * 1.5;
+                    res.jDroop = this.error * 3;
+                    res.jCons = this.error * 1.8;
+                }
+
+                return res;
+            }
+            
+            generateHeatmap() {
+                let size = Math.min(this.numBuses, 10); // cap for viz
+                let matrix = [];
+                for(let i=0; i<size; i++) {
+                    let row = [];
+                    for(let j=0; j<size; j++) {
+                        if(i===j) row.push(1);
+                        else {
+                            let val = Math.random() * (1 - this.error/100);
+                            row.push(Math.max(0, Math.min(1, val)));
+                        }
+                    }
+                    matrix.push(row);
+                }
+                return matrix;
+            }
+        }
+
+        class NetworkVisualizer {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                this.width = this.container.clientWidth;
+                this.height = this.container.clientHeight;
+                
+                this.svg = d3.select("#" + containerId).append("svg")
+                    .attr("width", this.width)
+                    .attr("height", this.height);
+                
+                this.g = this.svg.append("g");
+                
+                this.zoom = d3.zoom()
+                    .scaleExtent([0.5, 4])
+                    .on("zoom", (e) => this.g.attr("transform", e.transform));
+                
+                this.svg.call(this.zoom);
+                
+                this.tooltip = d3.select("#net-tooltip");
+                
+                this.colorScale = d3.scaleLinear()
+                    .domain([0.95, 1.0, 1.05])
+                    .range(["#3b82f6", "#10b981", "#ef4444"]);
+            }
+            
+            initNetwork(numBuses) {
+                this.g.selectAll("*").remove();
+                
+                // Generate mock topology
+                this.nodes = Array.from({length: numBuses}, (_, i) => ({ id: i, v: 1.0, p: Math.random() }));
+                this.links = [];
+                for(let i=1; i<numBuses; i++) {
+                    this.links.push({
+                        source: i,
+                        target: Math.floor(Math.random() * i),
+                        value: Math.random()
+                    });
+                    // add random extra links
+                    if(Math.random() > 0.7) {
+                        this.links.push({
+                            source: i,
+                            target: Math.floor(Math.random() * numBuses),
+                            value: Math.random()
+                        });
+                    }
+                }
+                
+                this.simulation = d3.forceSimulation(this.nodes)
+                    .force("link", d3.forceLink(this.links).id(d => d.id).distance(50))
+                    .force("charge", d3.forceManyBody().strength(-100))
+                    .force("center", d3.forceCenter(this.width / 2, this.height / 2));
+                    
+                this.linkElements = this.g.append("g")
+                    .selectAll("line")
+                    .data(this.links)
+                    .enter().append("line")
+                    .attr("stroke", "rgba(255,255,255,0.2)")
+                    .attr("stroke-width", d => Math.max(1, d.value * 3));
+                    
+                this.nodeElements = this.g.append("g")
+                    .selectAll("circle")
+                    .data(this.nodes)
+                    .enter().append("circle")
+                    .attr("r", d => 4 + d.p * 6)
+                    .attr("fill", d => this.colorScale(d.v))
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 1)
+                    .call(d3.drag()
+                        .on("start", this.dragstarted.bind(this))
+                        .on("drag", this.dragged.bind(this))
+                        .on("end", this.dragended.bind(this)));
+                        
+                this.nodeElements.on("mouseover", (e, d) => {
+                    this.tooltip.transition().duration(200).style("opacity", .95);
+                    this.tooltip.html(`
+                        <div style="font-weight:bold; margin-bottom:4px; border-bottom:1px solid #444;">Bus ${d.id}</div>
+                        <table>
+                            <tr><td>Voltage</td><td>${d.v.toFixed(3)} pu</td></tr>
+                            <tr><td>P_gen</td><td>${d.p.toFixed(2)} MW</td></tr>
+                        </table>
+                    `)
+                    .style("left", (e.pageX + 10) + "px")
+                    .style("top", (e.pageY - 28) + "px");
+                }).on("mouseout", () => {
+                    this.tooltip.transition().duration(500).style("opacity", 0);
+                });
+                        
+                this.simulation.on("tick", () => {
+                    this.linkElements
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+                        
+                    this.nodeElements
+                        .attr("cx", d => d.x)
+                        .attr("cy", d => d.y);
+                });
+            }
+            
+            update(data) {
+                if(!this.nodeElements) return;
+                
+                // Update voltages
+                this.nodes.forEach((n, i) => {
+                    if(data.v[i] !== undefined) n.v = data.v[i];
+                    if(data.p[i] !== undefined) n.p = data.p[i];
+                });
+                
+                this.nodeElements
+                    .attr("fill", d => this.colorScale(d.v))
+                    .attr("r", d => 4 + d.p * 6);
+            }
+            
+            dragstarted(e, d) {
+                if (!e.active) this.simulation.alphaTarget(0.3).restart();
+                d.fx = d.x; d.fy = d.y;
+            }
+            dragged(e, d) { d.fx = e.x; d.fy = e.y; }
+            dragended(e, d) {
+                if (!e.active) this.simulation.alphaTarget(0);
+                d.fx = null; d.fy = null;
+            }
+            
+            resize() {
+                this.width = this.container.clientWidth;
+                this.height = this.container.clientHeight;
+                this.svg.attr("width", this.width).attr("height", this.height);
+                this.simulation.force("center", d3.forceCenter(this.width / 2, this.height / 2));
+                this.simulation.alpha(0.3).restart();
+            }
+        }
+
+        class ChartManager {
+            constructor() {
+                this.maxPoints = 100;
+                this.charts = {};
+                this.sparks = {};
+                this.initCharts();
+                this.initSparks();
+            }
+
+            initCharts() {
+                // Frequency
+                this.charts.freq = new Chart(document.getElementById('freqChart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'ACNS', data: [], borderColor: '#3b82f6', tension: 0.4, borderWidth: 2 }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        animation: false,
+                        plugins: { legend: { display: true, labels:{color:'#fff'} } },
+                        scales: {
+                            x: { display: false },
+                            y: { min: 59.4, max: 60.6, grid: { color: 'rgba(255,255,255,0.1)' } }
+                        }
+                    }
+                });
+
+                // Voltage
+                this.charts.volt = new Chart(document.getElementById('voltageChart'), {
+                    type: 'bar',
+                    data: { labels: [], datasets: [{ label: 'Voltage (p.u.)', data: [], backgroundColor: '#10b981' }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, animation: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { min: 0.9, max: 1.1, grid: { color: 'rgba(255,255,255,0.1)' } }
+                        }
+                    }
+                });
+
+                // Error
+                this.charts.err = new Chart(document.getElementById('errorChart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'J(t)', data: [], borderColor: '#ef4444', tension: 0.4, borderWidth: 2 }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, animation: false,
+                        plugins: { legend: { display: true, labels:{color:'#fff'} } },
+                        scales: {
+                            x: { display: false },
+                            y: { type: 'logarithmic', min: 0.01, grid: { color: 'rgba(255,255,255,0.1)' } }
+                        }
+                    }
+                });
+            }
+            
+            initSparks() {
+                const opt = {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false } },
+                    elements: { point: { radius: 0 } }
+                };
+                
+                this.sparks.freq = new Chart(document.getElementById('spark-freq'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', borderWidth: 1 }] }, options: opt });
+                this.sparks.volt = new Chart(document.getElementById('spark-volt'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#10b981', borderWidth: 1 }] }, options: opt });
+                this.sparks.err = new Chart(document.getElementById('spark-err'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#ef4444', borderWidth: 1 }] }, options: opt });
+            }
+            
+            updateDatasets(compareMode) {
+                let dF = this.charts.freq.data;
+                let dE = this.charts.err.data;
+                
+                if(compareMode && dF.datasets.length === 1) {
+                    dF.datasets.push({ label: 'Droop', data: [], borderColor: '#f59e0b', tension: 0.4, borderWidth: 1, borderDash: [5,5] });
+                    dF.datasets.push({ label: 'Consensus', data: [], borderColor: '#9ca3af', tension: 0.4, borderWidth: 1, borderDash: [2,2] });
+                    dE.datasets.push({ label: 'Droop J', data: [], borderColor: '#f59e0b', tension: 0.4, borderWidth: 1, borderDash: [5,5] });
+                    dE.datasets.push({ label: 'Consensus J', data: [], borderColor: '#9ca3af', tension: 0.4, borderWidth: 1, borderDash: [2,2] });
+                } else if (!compareMode && dF.datasets.length > 1) {
+                    dF.datasets = [dF.datasets[0]];
+                    dE.datasets = [dE.datasets[0]];
+                }
+            }
+
+            pushData(data, compareMode) {
+                this.updateDatasets(compareMode);
+                
+                let t = data.time.toFixed(2);
+                let dF = this.charts.freq.data;
+                let dE = this.charts.err.data;
+                
+                // Add labels
+                dF.labels.push(t);
+                dE.labels.push(t);
+                
+                // Add data
+                dF.datasets[0].data.push(data.freq);
+                dE.datasets[0].data.push(data.j);
+                
+                if(compareMode) {
+                    dF.datasets[1].data.push(data.freqDroop);
+                    dF.datasets[2].data.push(data.freqCons);
+                    dE.datasets[1].data.push(data.jDroop);
+                    dE.datasets[2].data.push(data.jCons);
+                }
+
+                // Shift if max
+                if (dF.labels.length > this.maxPoints) {
+                    dF.labels.shift();
+                    dF.datasets.forEach(ds => ds.data.shift());
+                    dE.labels.shift();
+                    dE.datasets.forEach(ds => ds.data.shift());
+                }
+
+                // Update Voltages (Bar chart doesn't scroll, just replaces)
+                let dV = this.charts.volt.data;
+                dV.labels = Array.from({length: data.v.length}, (_,i) => `B${i+1}`);
+                dV.datasets[0].data = data.v;
+                dV.datasets[0].backgroundColor = data.v.map(v => v < 0.95 ? '#3b82f6' : (v > 1.05 ? '#ef4444' : '#10b981'));
+
+                // Apply
+                this.charts.freq.update();
+                this.charts.volt.update();
+                this.charts.err.update();
+                
+                // Update sparks
+                this.updateSpark(this.sparks.freq, t, Math.abs(60-data.freq));
+                let rmse = Math.sqrt(data.v.reduce((sq, val) => sq + Math.pow(val - 1.0, 2), 0) / data.v.length);
+                this.updateSpark(this.sparks.volt, t, rmse);
+                this.updateSpark(this.sparks.err, t, data.j);
+            }
+            
+            updateSpark(chart, label, val) {
+                chart.data.labels.push(label);
+                chart.data.datasets[0].data.push(val);
+                if(chart.data.labels.length > 30) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update();
+            }
+        }
+
+        class PheromoneHeatmap {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+            }
+            
+            render(matrix) {
+                if(!matrix || matrix.length === 0) return;
+                
+                const w = this.canvas.width = this.canvas.parentElement.clientWidth;
+                const h = this.canvas.height = this.canvas.parentElement.clientHeight;
+                
+                const rows = matrix.length;
+                const cols = matrix[0].length;
+                
+                const cellW = w / cols;
+                const cellH = h / rows;
+                
+                this.ctx.clearRect(0,0,w,h);
+                
+                for(let i=0; i<rows; i++) {
+                    for(let j=0; j<cols; j++) {
+                        let val = matrix[i][j];
+                        // Color map: dark blue to bright yellow
+                        let r = Math.floor(255 * val);
+                        let g = Math.floor(255 * val);
+                        let b = Math.floor(255 * Math.max(0, 0.5 - val));
+                        
+                        this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                        this.ctx.fillRect(j*cellW, i*cellH, cellW+1, cellH+1); // +1 to prevent gaps
+                    }
+                }
+            }
+        }
+
+        class SimulationManager {
+            constructor() {
+                this.isRunning = false;
+                this.stepCount = 0;
+                this.speed = 1;
+                this.compareMode = false;
+                this.useBackend = false;  // Try real backend first
+                this.apiBase = window.location.origin;
+                
+                this.mock = null;
+                this.charts = new ChartManager();
+                this.netViz = new NetworkVisualizer('network-container');
+                this.heatmap = new PheromoneHeatmap('pheromoneHeatmap');
+                
+                this.bindEvents();
+                
+                // Elements
+                this.elTime = document.getElementById('time-display');
+                this.elStep = document.getElementById('step-count');
+                this.elStatus = document.getElementById('conn-status');
+                this.elStatusText = document.getElementById('conn-text');
+                this.elWs = document.getElementById('ws-status');
+                
+                this.mFreq = document.getElementById('m-freq');
+                this.mVolt = document.getElementById('m-volt');
+                this.mError = document.getElementById('m-error');
+                
+                // Sync UI
+                this.updateSliders();
+                
+                // Check backend availability
+                this.checkBackend();
+                
+                window.addEventListener('resize', () => {
+                    this.netViz.resize();
+                    if(this.mock) this.heatmap.render(this.mock.generateHeatmap());
+                });
+            }
+
+            async checkBackend() {
+                try {
+                    const resp = await fetch(`${this.apiBase}/api/networks`, {signal: AbortSignal.timeout(2000)});
+                    if (resp.ok) {
+                        this.useBackend = true;
+                        this.elWs.innerText = 'Backend Connected';
+                        this.elWs.style.color = 'var(--success)';
+                        console.log('[ACNS] Real backend available');
+                    }
+                } catch(e) {
+                    this.useBackend = false;
+                    this.elWs.innerText = 'Demo Mode (no backend)';
+                    this.elWs.style.color = 'var(--warning)';
+                    console.log('[ACNS] Using mock backend (demo mode)');
+                }
+            }
+
+            async apiCall(path, method='GET', body=null) {
+                const opts = { method, headers: {'Content-Type': 'application/json'} };
+                if (body) opts.body = JSON.stringify(body);
+                const resp = await fetch(`${this.apiBase}${path}`, opts);
+                return resp.json();
+            }
+
+            bindEvents() {
+                // Sliders sync
+                document.querySelectorAll('input[type="range"]').forEach(el => {
+                    if(el.id.startsWith('param-') || el.id === 'dist-mag' || el.id === 'sim-speed') {
+                        el.addEventListener('input', (e) => {
+                            let display = document.getElementById('val-' + e.target.id.split('-')[1]);
+                            if(display) display.innerText = e.target.value;
+                            if(e.target.id === 'sim-speed') this.speed = parseInt(e.target.value);
+                        });
+                    }
+                });
+
+                document.getElementById('compare-mode').addEventListener('change', (e) => {
+                    this.compareMode = e.target.checked;
+                });
+
+                document.getElementById('btn-create').addEventListener('click', () => this.createSimulation());
+                document.getElementById('btn-start').addEventListener('click', () => this.start());
+                document.getElementById('btn-pause').addEventListener('click', () => this.pause());
+                document.getElementById('btn-reset').addEventListener('click', () => this.reset());
+                
+                document.getElementById('btn-inject').addEventListener('click', (e) => {
+                    let btn = e.target.closest('.btn');
+                    btn.classList.add('inject-anim');
+                    setTimeout(() => btn.classList.remove('inject-anim'), 500);
+                    this.injectDisturbance();
+                });
+            }
+
+            updateSliders() {
+                ['rho', 'kappa', 'eta', 'alpha', 'beta', 'speed', 'dist-mag'].forEach(id => {
+                    let el = document.getElementById(id === 'speed' ? 'sim-speed' : (id==='dist-mag'?'dist-mag':`param-${id}`));
+                    let display = document.getElementById(id === 'speed' ? 'val-speed' : `val-${id}`);
+                    if(el && display) display.innerText = el.value;
+                });
+            }
+
+            getParams() {
+                const p = {};
+                const tryGet = (id, key) => {
+                    const el = document.getElementById(id);
+                    if(el) p[key] = parseFloat(el.value);
+                };
+                tryGet('param-rho', 'rho');
+                tryGet('param-kappa', 'kappa');
+                tryGet('param-eta', 'eta_theta');
+                tryGet('param-alpha', 'alpha');
+                tryGet('param-beta', 'beta');
+                return p;
+            }
+
+            getNetworkId() {
+                const buses = parseInt(document.getElementById('network-select').value);
+                if(buses >= 100) return 'ieee118';
+                if(buses >= 25) return 'ieee30';
+                return 'ieee14';
+            }
+
+            async createSimulation() {
+                const buses = parseInt(document.getElementById('network-select').value);
+                this.stepCount = 0;
+
+                if (this.useBackend) {
+                    try {
+                        const networkId = this.getNetworkId();
+                        const result = await this.apiCall('/api/simulation/create', 'POST', {
+                            network: networkId,
+                            params: this.getParams()
+                        });
+                        if (result.status === 'success' && result.state) {
+                            const numBuses = result.state.n_buses || buses;
+                            this.netViz.initNetwork(numBuses);
+                            this.setStatus('Created (Backend)', '#3b82f6');
+                            this.elWs.innerText = `Backend: ${networkId} (${numBuses} buses)`;
+                            this.elWs.style.color = 'var(--success)';
+                            
+                            // Convert backend state to display format
+                            const data = this.convertBackendState(result.state);
+                            this.updateUI(data);
+                            return;
+                        }
+                    } catch(e) {
+                        console.warn('[ACNS] Backend create failed, using mock:', e);
+                    }
+                }
+
+                // Mock fallback
+                this.mock = new MockDataGenerator(buses);
+                this.netViz.initNetwork(buses);
+                this.setStatus('Created (Demo)', '#3b82f6');
+                this.elWs.innerText = 'Demo Mode';
+                this.elWs.style.color = 'var(--warning)';
+                let data = this.mock.step(this.compareMode);
+                this.updateUI(data);
+            }
+
+            convertBackendState(state) {
+                // Convert backend API state to the format our charts expect
+                const buses = state.buses || [];
+                const n = buses.length;
+                const v = buses.map(b => b.V || 1.0);
+                const p = buses.map(b => Math.abs(b.P || 0));
+                const q = buses.map(b => Math.abs(b.Q || 0));
+                const theta = buses.map(b => b.theta || 0);
+                
+                // Average frequency from buses
+                const wArr = buses.map(b => b.w || 60.0);
+                const avgFreq = wArr.reduce((a, b) => a + b, 0) / Math.max(n, 1);
+                
+                const m = state.metrics || {};
+                const j = m.global_error || 0;
+                
+                return {
+                    time: state.time || 0,
+                    freq: avgFreq,
+                    v, p, q, theta,
+                    j: j,
+                    pheromone: this._lastPheromone || this._genEmptyMatrix(Math.min(n, 20))
+                };
+            }
+
+            _genEmptyMatrix(size) {
+                let m = [];
+                for(let i = 0; i < size; i++) {
+                    let row = [];
+                    for(let j = 0; j < size; j++) row.push(i === j ? 1 : 0.5);
+                    m.push(row);
+                }
+                return m;
+            }
+
+            async start() {
+                if(!this.mock && !this.useBackend) this.createSimulation();
+                if(this.isRunning) return;
+                this.isRunning = true;
+                this.setStatus('Running', '#10b981');
+
+                if (this.useBackend) {
+                    this.backendLoop();
+                } else {
+                    this.loop();
+                }
+            }
+
+            pause() {
+                this.isRunning = false;
+                this.setStatus('Paused', '#f59e0b');
+                if (this.useBackend) {
+                    this.apiCall('/api/simulation/stop', 'POST').catch(() => {});
+                }
+            }
+
+            async reset() {
+                this.pause();
+                if (this.useBackend) {
+                    await this.apiCall('/api/simulation/reset', 'POST').catch(() => {});
+                }
+                this.createSimulation();
+            }
+            
+            async injectDisturbance() {
+                const mag = parseFloat(document.getElementById('dist-mag').value);
+                const busRaw = document.getElementById('dist-bus').value;
+                const distType = document.getElementById('dist-type')?.value || 'load';
+                
+                if (this.useBackend) {
+                    try {
+                        const buses = busRaw !== "" ? [parseInt(busRaw)] : null;
+                        await this.apiCall('/api/simulation/disturbance', 'POST', {
+                            type: distType,
+                            magnitude: mag / 100.0,
+                            buses
+                        });
+                        return;
+                    } catch(e) {
+                        console.warn('[ACNS] Backend disturbance failed:', e);
+                    }
+                }
+                
+                if(this.mock) {
+                    const bus = busRaw !== "" ? parseInt(busRaw) : null;
+                    this.mock.injectDisturbance(mag, bus);
+                }
+            }
+
+            setStatus(text, color) {
+                this.elStatusText.innerText = text;
+                this.elStatus.style.color = color;
+                this.elStatus.style.borderColor = color.replace(')', ', 0.2)').replace('rgb', 'rgba');
+                this.elStatus.style.backgroundColor = color.replace(')', ', 0.1)').replace('rgb', 'rgba');
+            }
+
+            updateUI(data) {
+                this.elTime.innerText = data.time.toFixed(2);
+                this.elStep.innerText = this.stepCount;
+                
+                this.charts.pushData(data, this.compareMode);
+                this.netViz.update(data);
+                this.heatmap.render(data.pheromone);
+                
+                // Metrics
+                let maxF = Math.abs(60 - data.freq);
+                this.mFreq.innerText = maxF.toFixed(3) + ' Hz';
+                this.mFreq.style.color = maxF > 0.1 ? 'var(--danger)' : 'var(--text-main)';
+                
+                let rmse = Math.sqrt(data.v.reduce((sq, val) => sq + Math.pow(val - 1.0, 2), 0) / data.v.length);
+                this.mVolt.innerText = rmse.toFixed(3) + ' p.u.';
+                
+                this.mError.innerText = data.j.toFixed(4);
+            }
+
+            // Backend-powered simulation loop
+            async backendLoop() {
+                if(!this.isRunning) return;
+                
+                let start = performance.now();
+                
+                try {
+                    // Run multiple steps on backend
+                    const stepsPerFrame = Math.max(1, this.speed * 5);
+                    const result = await this.apiCall('/api/simulation/step', 'POST');
+                    
+                    if (result.status === 'success' && result.state) {
+                        this.stepCount = result.state.step || this.stepCount + 1;
+                        
+                        // Fetch pheromone data periodically
+                        if (this.stepCount % 10 === 0) {
+                            this.apiCall('/api/simulation/pheromone').then(pr => {
+                                if (pr.status === 'success' && pr.pheromone?.matrix) {
+                                    this._lastPheromone = pr.pheromone.matrix;
+                                }
+                            }).catch(() => {});
+                        }
+                        
+                        const data = this.convertBackendState(result.state);
+                        this.updateUI(data);
+                    }
+                } catch(e) {
+                    console.error('[ACNS] Backend step error:', e);
+                }
+                
+                let end = performance.now();
+                document.getElementById('compute-time').innerText = (end - start).toFixed(1) + ' ms / step';
+                document.getElementById('mem-usage').innerText = 'Backend';
+                
+                // Throttle to ~30fps for API calls
+                setTimeout(() => {
+                    if(this.isRunning) requestAnimationFrame(() => this.backendLoop());
+                }, Math.max(16, 33 - (end - start)));
+            }
+
+            // Mock-powered simulation loop (demo mode)
+            loop() {
+                if(!this.isRunning) return;
+                
+                let start = performance.now();
+                
+                let data;
+                for(let i=0; i<this.speed; i++) {
+                    data = this.mock.step(this.compareMode);
+                    this.stepCount++;
+                }
+                
+                this.updateUI(data);
+                
+                let end = performance.now();
+                document.getElementById('compute-time').innerText = (end - start).toFixed(1) + ' ms / step';
+                document.getElementById('mem-usage').innerText = (Math.random()*10 + 40).toFixed(1) + ' MB';
+                
+                requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            window.simManager = new SimulationManager();
+        });
+
+    </script>
+</body>
+</html>
